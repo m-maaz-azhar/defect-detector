@@ -1,0 +1,13 @@
+.git
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.log
+runs
+data/raw
+data/labeled
+data/images
+data/annotations
+

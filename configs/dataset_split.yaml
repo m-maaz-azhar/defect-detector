@@ -1,0 +1,7 @@
+path: .
+train: data/labeled_by_split/images/train
+val: data/labeled_by_split/images/val
+test: data/labeled_by_split/images/test
+
+names:
+  0: defect

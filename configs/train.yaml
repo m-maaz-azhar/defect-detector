@@ -1,0 +1,32 @@
+model: yolov8s-seg.pt
+data: configs/dataset.yaml
+
+project: runs/segment
+name: defect_poc
+
+# Safe GTX 1660 Super baseline (6 GB VRAM)
+epochs: 60
+imgsz: 640
+batch: 4
+device: 0
+workers: 2
+patience: 15
+pretrained: true
+optimizer: auto
+seed: 42
+
+# POC-safe augmentation knobs
+hsv_h: 0.015
+hsv_s: 0.4
+hsv_v: 0.4
+degrees: 4.0
+translate: 0.08
+scale: 0.2
+perspective: 0.001
+fliplr: 0.5
+mosaic: 0.2
+copy_paste: 0.0
+
+export_onnx: true
+best_weights_out: models/weights/best.pt
+onnx_out: models/weights/model.onnx
