@@ -1,4 +1,4 @@
-# Defect Detector MVP (Easy Setup)
+# Defect Detector MVP (Setup)
 
 Simple pothole/defect detection app using YOLO segmentation.
 
