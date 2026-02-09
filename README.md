@@ -1,158 +1,96 @@
-# Defect Detector (YOLO Segmentation POC)
+# Defect Detector MVP (Easy Setup)
 
-POC-grade defect segmentation pipeline using Python, Ultralytics YOLO, OpenCV, Albumentations, FastAPI, and Docker.
+Simple pothole/defect detection app using YOLO segmentation.
 
-## Stack
+This guide is focused on one goal: get the app running fast.
 
-- Python
-- PyTorch + Ultralytics YOLO (segmentation)
-- OpenCV
-- Albumentations
-- FastAPI (optional serving layer)
-- Docker
+## 1. Prerequisites
 
-## Repository Layout
+- Windows PowerShell
+- Python 3.11 recommended
+- NVIDIA GPU optional (works on CPU too, slower)
 
-```text
-data/
-  raw/        # untouched originals
-  labeled/    # YOLO-seg dataset export (images + labels)
-  splits/     # train/val/test .txt lists
-configs/
-  dataset.yaml
-  train.yaml
-src/
-  train.py
-  infer.py
-  postprocess.py
-  calibration.py
-  schemas.py
-  prepare_dataset.py
-  build_splits.py
-models/
-  weights/    # best.pt, model.onnx
-demo/
-  app.py      # streamlit demo
-api/
-  main.py     # fastapi app
-```
+## 2. Install
 
-## Data Format Expected
+From repo root:
 
-Training expects YOLO segmentation format under:
-
-```text
-data/labeled/
-  images/
-    *.jpg|*.png|...
-  labels/
-    *.txt  # normalized class + polygon points
-```
-
-Notes:
-- This repo already contains `data/images` + `data/annotations` (VOC XML). `src.prepare_dataset` converts them into YOLO-seg labels.
-- For this bootstrap conversion, each VOC box is emitted as a 4-point rectangle polygon (good for POC flow validation, not mask-quality ground truth).
-
-## Setup
-
-```bash
+```powershell
 python -m venv .venv
-.venv\Scripts\activate
+.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-## Prepare Dataset (from included VOC XML)
+## 3. Prepare dataset (one time)
 
-```bash
-python -m src.prepare_dataset ^
-  --annotations-dir data/annotations ^
-  --images-dir data/images ^
-  --out-images-dir data/labeled/images ^
-  --out-labels-dir data/labeled/labels ^
-  --splits-dir data/splits ^
-  --train-ratio 0.8 --val-ratio 0.1 --test-ratio 0.1
+Use included XML + images and convert to YOLO-seg format:
+
+```powershell
+python -m src.prepare_dataset --annotations-dir data/annotations --images-dir data/images --out-images-dir data/labeled/images --out-labels-dir data/labeled/labels --splits-dir data/splits
 ```
 
-If your labels already exist in YOLO-seg format (Roboflow/Label Studio export), only build splits:
+## 4. Train model (skip if you already have weights)
 
-```bash
-python -m src.build_splits ^
-  --images-dir data/labeled/images ^
-  --labels-dir data/labeled/labels ^
-  --out-dir data/splits
-```
-
-## Train
-
-```bash
+```powershell
 python -m src.train --config configs/train.yaml
 ```
 
-Artifacts:
+Expected output files:
+
 - `models/weights/best.pt`
-- `models/weights/model.onnx` (if export enabled)
+- `models/weights/model.onnx` (if export is enabled)
 
-## Inference (CLI)
+## 5. Start the UI app
 
-```bash
-python -m src.infer --weights models/weights/best.pt --image path\to\image.jpg --pretty
+```powershell
+python -m streamlit run demo/app.py
 ```
 
-Optional calibration:
-- Fixed scale:
-```bash
-python -m src.infer --weights models/weights/best.pt --image img.jpg --fixed-mm-per-px 0.05 --pretty
+Then open the URL Streamlit prints (usually `http://localhost:8501`).
+
+In the app sidebar:
+
+- Set `Weights` to `models/weights/best.pt`
+- Select `Device` (`0` for GPU, `cpu` for CPU)
+- Upload image and run detection
+
+## 6. Optional CLI check
+
+```powershell
+python -m src.infer --weights models/weights/best.pt --image data/images/potholes600.png --conf 0.40 --pretty
 ```
-- Marker-based scale (known marker side in mm):
-```bash
-python -m src.infer --weights models/weights/best.pt --image img.jpg --marker-size-mm 20 --pretty
-```
 
-JSON output per defect:
-- `id`
-- `class`
-- `confidence`
-- `bbox` (`[x1, y1, x2, y2]`)
-- `mask_area_px`
-- `area_mm2` (nullable)
-- `calibration` (`method`, `mm_per_px`) or `null`
+## 7. Optional API mode
 
-## API
-
-Run:
-
-```bash
+```powershell
 uvicorn api.main:app --reload
 ```
 
 Endpoints:
+
 - `GET /health`
-- `POST /infer` (multipart upload, optional `fixed_mm_per_px`, `marker_size_mm`)
+- `POST /infer`
 
-`/health` returns `degraded` when local weights are configured but missing, so startup no longer fails silently.
+## Troubleshooting
 
-## Demo
+- `ModuleNotFoundError: No module named 'src'`
+  Run Streamlit with:
+  `python -m streamlit run demo/app.py`
 
-```bash
-streamlit run demo/app.py
+- No GPU detected:
+  Verify with:
+  `python -c "import torch; print(torch.cuda.is_available())"`
+
+- Missing weights:
+  Train first or point app to an existing `.pt` file.
+
+## Project layout (minimal)
+
+```text
+configs/         # train + dataset config
+data/            # raw, labeled, splits
+demo/app.py      # streamlit UI
+api/main.py      # fastapi server
+src/train.py     # training
+src/infer.py     # inference
+models/weights/  # best.pt, model.onnx
 ```
-
-## Docker
-
-Build and run:
-
-```bash
-docker build -t defect-detector .
-docker run --rm -p 8000:8000 defect-detector
-```
-
-## POC Evaluation Checklist
-
-- Track recall on defects.
-- Track false positives per image.
-- Verify area ordering sanity (bigger defects should map to bigger areas).
-- Spot-check 30-50 unseen images.
-- Keep an error gallery:
-  - `data/error_gallery/missed`
-  - `data/error_gallery/false_positive`
-  - `data/error_gallery/bad_area`
